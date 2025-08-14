@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qobuz Search - Material AMOLED UI</title>
+    <style>
+        /* Global Styles */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Roboto', sans-serif;
+            background-color: #000000; /* AMOLED black */
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Search Bar */
+        .search-container {
+            width: 90%;
+            max-width: 800px;
+            margin: 40px 0 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        #search-input {
+            width: 70%;
+            padding: 14px 18px;
+            font-size: 16px;
+            border: none;
+            border-radius: 24px 0 0 24px; /* Smooth rounded edges */
+            background-color: #1e1e1e;
+            color: #ffffff;
+            outline: none;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5); /* Material shadow */
+            transition: box-shadow 0.3s ease;
+        }
+
+        #search-input:focus {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.7);
+        }
+
+        #search-button {
+            padding: 14px 28px;
+            font-size: 16px;
+            border: none;
+            border-radius: 0 24px 24px 0;
+            background: linear-gradient(45deg, #6200ea, #7c4dff); /* Gradient button */
+            color: #ffffff;
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
+        }
+
+        #search-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.7);
+        }
+
+        /* Results Sections */
+        .results-container {
+            width: 90%;
+            max-width: 1200px;
+            margin-bottom: 40px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section h2 {
+            font-size: 26px;
+            margin-bottom: 20px;
+            text-align: left;
+            color: #cccccc;
+            letter-spacing: 0.5px;
+        }
+
+        .cards {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 24px;
+            justify-content: flex-start;
+        }
+
+        .card {
+            background-color: #121212; /* Dark material card */
+            border-radius: 16px; /* Smooth edges */
+            overflow: hidden;
+            width: 220px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6); /* Elevated shadow */
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+        }
+
+        .card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.8);
+        }
+
+        .card img {
+            width: 100%;
+            height: 220px;
+            object-fit: cover;
+        }
+
+        .card-content {
+            padding: 16px;
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card-subtitle {
+            font-size: 14px;
+            color: #aaaaaa;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Loader */
+        #loader {
+            font-size: 18px;
+            margin: 20px;
+            display: none;
+            text-align: center;
+        }
+
+        .spinner {
+            border: 4px solid #444;
+            border-top: 4px solid #7c4dff;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            animation: spin 1s linear infinite;
+            margin: 10px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Empty Results */
+        .empty {
+            font-size: 16px;
+            color: #aaaaaa;
+        }
+
+        /* Error Message */
+        #error-message {
+            display: none;
+            color: #ff5252;
+            font-size: 16px;
+            margin: 20px;
+            text-align: center;
+        }
+
+        /* Font Import */
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+    </style>
+</head>
+<body>
+    <div class="search-container">
+        <input type="text" id="search-input" placeholder="Search songs, albums, or artists...">
+        <button id="search-button">Search</button>
+    </div>
+
+    <div id="error-message"></div>
+
+    <div class="results-container">
+        <div id="artists-section" class="section">
+            <h2>Artists</h2>
+            <div class="cards" id="artists-cards"></div>
+        </div>
+        <div id="albums-section" class="section">
+            <h2>Albums</h2>
+            <div class="cards" id="albums-cards"></div>
+        </div>
+        <div id="tracks-section" class="section">
+            <h2>Tracks</h2>
+            <div class="cards" id="tracks-cards"></div>
+        </div>
+    </div>
+
+    <div id="loader"><div class="spinner"></div>Loading...</div>
+
+    <script>
+        const searchButton = document.getElementById('search-button');
+        const searchInput = document.getElementById('search-input');
+        const loader = document.getElementById('loader');
+        const errorMessage = document.getElementById('error-message');
+
+        const artistsCards = document.getElementById('artists-cards');
+        const albumsCards = document.getElementById('albums-cards');
+        const tracksCards = document.getElementById('tracks-cards');
+
+        searchButton.addEventListener('click', performSearch);
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') performSearch();
+        });
+
+        async function performSearch() {
+            const query = searchInput.value.trim();
+            if (!query) {
+                showError('Please enter a search term.');
+                return;
+            }
+
+            clearResults();
+            clearError();
+            loader.style.display = 'block';
+
+            try {
+                const appId = '798273057'; // Your Qobuz app_id
+                const url = `https://www.qobuz.com/api.json/0.2/search?query=${encodeURIComponent(query)}&limit=20&app_id=${appId}`;
+                const response = await fetch(url, {
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                displayResults(data);
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Failed to fetch results. Try again or check your network.');
+            } finally {
+                loader.style.display = 'none';
+            }
+        }
+
+        function clearResults() {
+            artistsCards.innerHTML = '';
+            albumsCards.innerHTML = '';
+            tracksCards.innerHTML = '';
+        }
+
+        function clearError() {
+            errorMessage.style.display = 'none';
+            errorMessage.textContent = '';
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+
+        function displayResults(data) {
+            // Artists
+            if (data.artists && data.artists.items.length > 0) {
+                data.artists.items.forEach(artist => {
+                    const card = createCard(
+                        artist.image?.small || 'https://via.placeholder.com/220',
+                        artist.name,
+                        `${artist.albums_count} albums`,
+                        `https://open.qobuz.com/artist/${artist.id}`
+                    );
+                    artistsCards.appendChild(card);
+                });
+            } else {
+                artistsCards.innerHTML = '<p class="empty">No artists found.</p>';
+            }
+
+            // Albums
+            if (data.albums && data.albums.items.length > 0) {
+                data.albums.items.forEach(album => {
+                    const card = createCard(
+                        album.image?.small || 'https://via.placeholder.com/220',
+                        album.title,
+                        album.artist?.name || 'Unknown Artist',
+                        `https://open.qobuz.com/album/${album.id}`
+                    );
+                    albumsCards.appendChild(card);
+                });
+            } else {
+                albumsCards.innerHTML = '<p class="empty">No albums found.</p>';
+            }
+
+            // Tracks
+            if (data.tracks && data.tracks.items.length > 0) {
+                data.tracks.items.forEach(track => {
+                    const card = createCard(
+                        track.album?.image?.small || 'https://via.placeholder.com/220',
+                        track.title,
+                        `${track.performer?.name || 'Unknown Artist'} - ${track.album?.title || 'Unknown Album'}`,
+                        `https://open.qobuz.com/track/${track.id}`
+                    );
+                    tracksCards.appendChild(card);
+                });
+            } else {
+                tracksCards.innerHTML = '<p class="empty">No tracks found.</p>';
+            }
+        }
+
+        function createCard(imageUrl, title, subtitle, link) {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <img src="${imageUrl}" alt="${title}">
+                <div class="card-content">
+                    <div class="card-title">${title}</div>
+                    <div class="card-subtitle">${subtitle}</div>
+                </div>
+            `;
+            card.addEventListener('click', () => {
+                window.open(link, '_blank');
+            });
+            return card;
+        }
+    </script>
+</body>
+</html>
